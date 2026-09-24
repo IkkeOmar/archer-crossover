@@ -244,30 +244,60 @@ def backtest_arrows(
         position[ti:] = new_pos
         last_target = ti
 
-    # Compute equity curve with transaction costs at position changes
+    # Compute equity curve with transaction costs at position changes.
+    #
+    # Position accounting:
+    #   - Long:  pay cash -> own units -> MTM = units * price. Equity = cash + units * price.
+    #   - Short: borrow units, receive cash = units * entry_price. MTM = units * (entry - current).
+    #            Equity = cash + short_pnl.
+    #   - Cash:  equity = cash.
+    #
+    # The cost is applied as a fraction of the notional traded at each entry/exit.
     cost_rate = cost_bps / 10000.0  # 5 bps = 0.0005
     equity = np.full(n, initial_cash, dtype=np.float64)
     cash = initial_cash
-    pos_units = 0.0  # number of units held (in price terms, notional)
+    long_units = 0.0          # units held when long
+    short_entry_price = 0.0   # entry price of current short position
+    short_units = 0.0         # units sold short (positive magnitude)
     last_pos_size = 0.0
 
     for t in range(n):
-        # Detect position change
         if position[t] != last_pos_size:
-            # Liquidate existing position at close[t], pay cost
-            if pos_units != 0:
-                cash += pos_units * prices[t]
-                pos_units = 0
-            # Enter new position at close[t], pay cost
-            target_notional = abs(position[t]) * cash
-            if target_notional > 0:
-                cost = target_notional * cost_rate
-                # Apply cost then buy
-                pos_units = np.sign(position[t]) * (target_notional - cost) / prices[t]
-                cash -= target_notional
+            # Close existing position at close[t]
+            if last_pos_size > 0:
+                # Was long: sell long_units at price[t]
+                cash += long_units * prices[t]
+                long_units = 0.0
+            elif last_pos_size < 0:
+                # Was short: buy back short_units at price[t]
+                cost_close = short_units * prices[t] * cost_rate
+                cash -= short_units * prices[t]
+                cash -= cost_close
+                short_units = 0.0
+                short_entry_price = 0.0
+
+            # Enter new position at close[t]
+            if position[t] > 0:
+                # Go long: spend cash, own units
+                target_notional = position[t] * cash
+                if target_notional > 0:
+                    cost = target_notional * cost_rate
+                    long_units = (target_notional - cost) / prices[t]
+                    cash -= target_notional
+            elif position[t] < 0:
+                # Go short: borrow units, receive cash
+                target_notional = abs(position[t]) * cash
+                if target_notional > 0:
+                    cost = target_notional * cost_rate
+                    short_units = (target_notional - cost) / prices[t]
+                    short_entry_price = prices[t]
+                    cash += short_units * prices[t] - cost
             last_pos_size = position[t]
-        # Mark-to-market: cash + units * price
-        equity[t] = cash + pos_units * prices[t]
+
+        # Mark-to-market
+        long_mtm = long_units * prices[t]
+        short_mtm = short_units * (short_entry_price - prices[t])
+        equity[t] = cash + long_mtm + short_mtm
 
     n_trades = int(np.sum(np.diff(position) != 0))
     total_return = float(equity[-1] / initial_cash - 1.0) if initial_cash > 0 else 0.0
