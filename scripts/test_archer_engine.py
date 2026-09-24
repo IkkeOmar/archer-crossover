@@ -34,18 +34,25 @@ def test_long_entry_exit_same_price():
 
 
 def test_short_entry_exit_same_price():
-    """Short round-trip should give roughly B&H return on the decline (with costs)."""
+    """bear_alloc=1.0 means bearish cross -> full short (position=-1).
+
+    A V-shape 150 -> 100 -> 150 should give ~80% gross (50% down-leg + 50% up-leg)
+    minus round-trip costs.
+    """
     prices = np.concatenate([
         np.full(20, 150.0),         # flat warm-up
-        np.linspace(150, 100, 10),  # clear downtrend -> cross down -> short
-        np.full(40, 100.0),         # flat forever after
+        np.linspace(150, 100, 10),  # downtrend -> cross down -> short
+        np.full(40, 100.0),         # flat at bottom
+        np.linspace(100, 150, 10),  # uptrend -> cross up -> long
+        np.full(20, 150.0),         # flat at top
     ])
     res = backtest_arrows(prices, n_mu=0, x_zero=1.0, bear_alloc=1.0,
                           fast_period=2, slow_period=5, cost_bps=5.0)
-    # B&H decline: 150 -> 100 = -33%
-    # Archer: short at cross (~140), holds to 100 = +29% gross - 10bps
-    assert res.total_return > 0.20, f"Short-only should give >+20%, got {res.total_return*100:.2f}%"
-    assert res.total_return < 0.50, f"Should be capped, got {res.total_return*100:.2f}%"
+    # Short at ~140, close at ~110 (cross up at some point) -> +27%
+    # Long at ~110, hold to 150 -> +36%
+    # Compounded: ~+72%, minus costs ~+70%
+    assert res.total_return > 0.50, f"V-shape with full short should give >+50%, got {res.total_return*100:.2f}%"
+    assert res.total_return < 0.85, f"Should not exceed +85%, got {res.total_return*100:.2f}%"
 
 
 def test_no_double_counting_at_zero_cost():

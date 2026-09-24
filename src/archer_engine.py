@@ -273,15 +273,13 @@ def backtest_arrows(
                 long_units = 0.0
             elif last_pos_size < 0:
                 # Was short: buy back short_units to close.
-                # We pay current_price * units, but receive back the borrowed
-                # value (units * entry_price). Net cash flow = (entry - current) * units.
-                # Plus entry/exit costs (cost already paid at entry; we add exit cost now).
+                # We pay current_price * units to buy back the borrowed shares.
+                # Cash at this moment already includes the original cash + sale proceeds.
+                # After paying buyback + cost, cash = original + (sale_proceeds - buyback - costs)
+                # = original + realized_pnl - costs.
                 cost_close = short_units * prices[t] * cost_rate
-                # Cash at this moment equals (sale_proceeds - entry_cost).
-                # Realized short PnL: (entry_price - current_price) * short_units.
-                # Add realized PnL to cash, subtract exit cost.
-                realized_pnl = (short_entry_price - prices[t]) * short_units
-                cash += realized_pnl - cost_close
+                buyback_cost = short_units * prices[t]
+                cash -= buyback_cost + cost_close
                 short_units = 0.0
                 short_entry_price = 0.0
 
@@ -295,16 +293,16 @@ def backtest_arrows(
                     cash -= target_notional
             elif position[t] < 0:
                 # Go short: borrow units, sell for cash.
-                # Accounting model: cash represents the proceeds from selling
-                # the borrowed units. When we later buy them back (exit), cash
-                # grows by the price difference (or shrinks if price rose).
-                # Equity = cash + short_pnl where short_pnl = units * (entry - current).
+                # Accounting: cash stays at its previous value (it's our "base"),
+                # and we ADD the sale proceeds on top. When we close the short,
+                # we ADD the realized PnL = (entry - current) * units.
+                # Equity = cash + short_mtm where short_mtm = units * (entry - current).
                 target_notional = abs(position[t]) * cash
                 if target_notional > 0:
                     short_units = target_notional / prices[t]
                     sale_proceeds = short_units * prices[t]
                     cost = sale_proceeds * cost_rate
-                    cash = sale_proceeds - cost  # replace cash with proceeds
+                    cash += sale_proceeds - cost  # ADD proceeds on top of base cash
                     short_entry_price = prices[t]
             last_pos_size = position[t]
 
