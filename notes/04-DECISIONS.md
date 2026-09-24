@@ -136,3 +136,59 @@
 **Implementation:** `submit_array.sh` will be rewritten to use this pattern.
 
 **Note:** Research reported LSF 9.3.1 on DTU HPC; our earlier DTU docs read said 10. Both versions support job arrays — syntax identical.
+
+---
+
+## D14: Use arxiv 2602.10785 walk-forward methodology (from simple-test research)
+
+**Source:** Sub-agent research 2026-09-24 → `notes/06-SIMPLE-TEST-RESEARCH.md`.
+
+**Key findings from arxiv paper:**
+- Tested EMA crossover across 1min–60min on BTC/ETH/BNB with 0.1% fees.
+- Below 30min, all strategies lost to costs. Break-even ~0.4%/trade.
+- Walk-forward window size has a LARGE effect on Sharpe — must fix before sweeping delay.
+- Their primary ranking metric is Robust Sharpe Ratio (deflated Sharpe).
+- Block-bootstrap null control: strategy must beat randomly-generated EMA params.
+
+**Decision:** Adopt in Phase 2:
+- Walk-forward with FIXED window size (don't sweep over windows).
+- Robust Sharpe Ratio as primary ranking metric (not raw Sharpe).
+- Block bootstrap null control in Phase 3 (compare to random EMA param sets).
+
+---
+
+## D15: Report all ticker/timeframe combos, not just winners
+
+**Source:** OpenAlgo tutorial warning + sub-agent research.
+
+**Key principle:** "Finding the single highest-scoring parameter combination is easy and almost always a trap. The real skill is finding a *region* of settings that all work."
+
+**Decision:** Every sweep result goes into the per-combo CSV. Reports show:
+- Top-N by Sharpe (with full params)
+- Median Sharpe across all combos (to see typical outcome)
+- Cross-ticker consistency: same parameter zone works on multiple tickers? (this is the real signal)
+- Bottom-N (to see worst cases for tail risk)
+
+**Avoid:** Reporting only the single best ticker/timeframe. With 27+ combos to choose from, the "winner" is almost certainly lucky.
+
+---
+
+## D16: Multi-ticker default sweep uses bear_alloc=1.0 only
+
+**Source:** Sub-agent research 2026-09-24, Section (c): "100% allocation is the right default for sanity tests."
+
+**Decision:** In Phase 1 default sweep, fix `bear_alloc_1d = 1.0` (full long/short) for all tickers. Sweep only `(n_mu, x, ema_pair)`.
+
+**Rationale:** Bear allocation is a position-sizing concern that should be explored AFTER signal quality is established. Mixing it with delay parameters creates confounding.
+
+**Note:** SPEC.md Section 2.2 retains the bear_alloc_1d grid as a Phase 3 dimension, but Phase 1 holds it fixed to isolate the delay signal's edge.
+
+---
+
+## D17: Phase 2 walk-forward window size = 252 days (1 year)
+
+**Source:** arxiv 2602.10785 methodology + standard quant practice.
+
+**Decision:** Walk-forward with 252-day training window and 63-day (1 quarter) testing window. Roll forward by 63 days at each step. Use 2015-2024 data → ~28 walk-forward steps.
+
+**Rationale:** 252/63 ratio matches the conventional "train 1 year, test 1 quarter" pattern. Fixed before sweeping over delay parameters.
