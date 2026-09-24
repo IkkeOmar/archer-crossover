@@ -72,6 +72,14 @@ cat "$PARAMS_FILE"
 
 # ---------------- submit job array ----------------
 
+# Each task: one (ticker, timeframe) pair, full big_sweep with all freedoms
+# Grid: 8 n_mu x 5 x x 3 bear_alloc x 3 ema_pair = 360 combos per task
+# With 50 MC seeds + 35 WF windows = 360 * 50 * 35 = 630,000 backtests per task
+# At ~0.0034s per backtest = ~36 min per task on 1 core, ~9 min on 4 cores
+# 24 tasks total (9 tickers * 2-3 timeframes) = ~3.5 hours wall clock with parallelism
+
+# Walltime budget: 4 hours per task (max 72h on hpc queue, leaving headroom)
+
 echo
 echo "Submitting job array 'sweep[1-$N]' to queue '$QUEUE' (${N_CORES} cores, ${MEM_PER_PROC_KB} KB mem, $WALLTIME walltime)"
 
@@ -83,7 +91,7 @@ bsub -q "$QUEUE" \
   -M "$MEM_PER_PROC_KB" \
   -W "$WALLTIME" \
   -o "results/logs/${JOB_NAME}_%J_%I.out" \
-  -e "results/logs/${JOB_NAME}_%J_%I.err" \
+  -e "results/logs/${JOB_NAME}_%I.err" \
   <<EOF
 #!/bin/sh
 #BSUB -q $QUEUE
@@ -110,10 +118,13 @@ TIMEFRAME=\$(echo "\$ROW" | cut -f2)
 
 echo "[\$(date)] Job \$LSB_JOBINDEX: ticker=\$TICKER timeframe=\$TIMEFRAME"
 
-python3 -m src.sweep \\
+# Run big_sweep.py (full freedom-sweep) instead of old src.sweep
+python3 scripts/big_sweep.py \\
   --ticker "\$TICKER" \\
   --timeframe "\$TIMEFRAME" \\
-  --grid-mode default
+  --n-mc-seeds 50 \\
+  --n-wf-windows 35 \\
+  --out-dir results/big_sweep
 
 # Completion sentinel
 touch results/.done_\${LSB_JOBINDEX}

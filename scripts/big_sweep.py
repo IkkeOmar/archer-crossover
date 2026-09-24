@@ -29,14 +29,17 @@ from src.data_loader import load_one
 from src.archer_engine import backtest_arrows
 from src.walkforward import walk_forward_one
 
-# Default grid (large but tractable)
+# Default grid (large for cluster-worthy sweep)
+# 15 * 8 * 5 * 5 = 3000 combos per (ticker, timeframe)
+# With 50 MC seeds + 35 WF windows = 3000 * 50 * 35 = 5.25M backtests per task
+# At ~0.00026s per backtest = ~22 min per task on 1 core, ~6 min on 4 cores
+# 24 tasks total * 6 min = 2.5 hours wall clock — adjust n_mu_seeds for 4 hour target
 BIG_GRID = {
-    'n_mu': [1, 3, 5, 8, 12, 18, 25, 35],
-    'x': [0.0, 0.25, 0.5, 0.75, 1.0],
-    'bear_alloc': [0.0, 0.5, 1.0],
-    'ema_pairs': [(9, 21), (12, 26), (20, 50)],
+    'n_mu': [1, 2, 3, 5, 7, 10, 14, 19, 25, 33, 42, 55, 70, 90, 120],
+    'x': [0.0, 0.1, 0.25, 0.4, 0.55, 0.7, 0.85, 1.0],
+    'bear_alloc': [0.0, 0.25, 0.5, 0.75, 1.0],
+    'ema_pairs': [(8, 21), (9, 21), (10, 30), (12, 26), (20, 50)],
 }
-# 8 * 5 * 3 * 3 = 360 combos per (ticker, timeframe)
 
 TICKERS = ['SPY', 'QQQ', 'IWM', 'AAPL', 'GOOGL', 'BTC-USD', 'ETH-USD', 'GLD', 'SLV']
 TIMEFRAMES_AVAILABLE = {
