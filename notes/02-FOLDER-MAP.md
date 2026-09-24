@@ -38,7 +38,10 @@ archer-crossover/
 |   |-- 04-DECISIONS.md      # Design decisions with rationale.
 |   |                          # Why this approach, not that one.
 |   |
-|   |-- 05-RESULTS-LOG.md    # (empty until Phase 1) Findings as we run sweeps.
+    |-- 05-RESULTS-LOG.md    # (empty until Phase 1) Findings as we run sweeps.
+   |
+   |-- 05-LSF-NOTES.md      # DTU HPC LSF submission patterns (job arrays, resources).
+   |                          # Persistent reference for submit scripts.
 |   |
 |   `-- 99-LATEX-REPORT-PLAN.md  # Outline of the final report. Phase 4.
 |
@@ -142,3 +145,13 @@ When new research is done:
 When a design decision is made:
 1. Add to `notes/04-DECISIONS.md` with: what, alternatives considered, why this one
 2. Commit
+
+---
+
+## Files added since first version (2026-09-24)
+
+- `notes/05-LSF-NOTES.md` — DTU HPC LSF submission patterns (resource directives, job arrays, aggregation)
+- `notes/04-DECISIONS.md` — added D11 (custom numpy over vectorbt), D12 (QuantGuild validation framework), D13 (LSF native job arrays)
+- `scripts/submit_array.sh` — rewritten to use native job arrays + params.tsv (vs. shell loop)
+- `src/archer_engine.py`, `src/sweep.py`, `src/plots.py`, `src/report.py`, `src/metrics.py`, `src/synthetic.py`, `src/data_loader.py` — Phase 1 implementation
+- `configs/default.yaml` — sweep configuration

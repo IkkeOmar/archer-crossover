@@ -194,11 +194,12 @@ Plus global summary:
 
 ## 12. Open Questions
 
-- [ ] QuantGuild relevance — to research during Phase 0
+- [x] QuantGuild relevance — researched 2026-09-24; educational reference only, no turnkey backtest library. Lecture 97 (3 Backtesting Pitfalls) is directly relevant for our strategy-vs-noise framework. QuantGuild techniques to adopt: walk-forward validation, out-of-sample split, economic interpretability check.
 - [ ] Options-hedge modeling — deferred to Phase 3, conservative 15% drag on gains when hedging
 - [ ] σ_n sensitivity — default μ_n/2, sweep in Phase 3
 - [ ] Should we add more EMA pairs? — TBD after Phase 1 results
 - [ ] Slippage realism — 0.05% default, may need to adjust per asset class
+- [ ] Walk-forward validation + OOS split — add to Phase 2 (from QuantGuild finding)
 
 ---
 

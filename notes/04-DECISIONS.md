@@ -96,3 +96,43 @@
 - Slippage realism per asset class — defer until Phase 1 results inspected
 - More EMA pairs? — defer until Phase 1 results inspected
 - Block size for block-bootstrap — defer to Phase 3
+
+---
+
+## D11: Custom numpy engine (not vectorbt)
+
+**Decision:** Build backtest in pure numpy/pandas, not adopt vectorbt.
+
+**Considered:** vectorbt (recommended by research as fastest for param sweeps, ~10k combos in seconds).
+
+**Why not:** Our sweep is ~540 combos × ~2500 candles ≈ 1.4M candle-evaluations, ~30 sec per combo with pure numpy — well within budget for parallel cluster execution. vectorbt's main value (Numba-vectorized param sweep) gives us less benefit than its complexity cost (Numba dependency, custom-indicator boilerplate, less control over stochastic delay logic). Our verify-still-same-side logic + delay sampling is custom and would need a custom IndicatorFactory anyway.
+
+**Future option:** If Phase 2 reveals we need >50k combos, revisit vectorbt PRO for chunked parallel execution.
+
+---
+
+## D12: QuantGuild validation framework (from research)
+
+**Decision:** Adopt three QuantGuild techniques from Lecture 97 into Phase 2:
+
+1. **Walk-forward validation** — split data into rolling train/test windows; only count parameterizations that work across multiple windows as "robust."
+2. **Out-of-sample split** — reserve last 20% of data for honest evaluation; never tune on it.
+3. **Look-ahead bias audit** — explicit checklist for each strategy step confirming only-t information is used.
+
+**Rationale:** These are the standard defenses against overfitting in quantitative finance. Our existing Monte Carlo (random reseeds of delay sampling) tests signal stability but not parameter robustness across time regimes. Walk-forward closes that gap.
+
+**Source:** QuantGuild Lecture 97 — "3 Backtesting Pitfalls That Ruin Your Strategy" — research logged 2026-09-24 in `notes/01-RESEARCH-LOG.md` section 6.
+
+---
+
+## D13: LSF native job arrays (not looped bsub)
+
+**Decision:** Use LSF native job arrays via `bsub -J "sweep[1-N]"` with a TSV parameter table.
+
+**Considered:** Simple shell loop `for combo in combos: bsub ...`.
+
+**Why:** Native arrays group jobs in the scheduler, allow `bjobs -J "sweep[*]"`, support `bsub -w "done(sweep)"` wait dependencies, and use a single `-J` index to look up the row in a `params.tsv`. Reduces scheduler overhead and gives clean aggregation.
+
+**Implementation:** `submit_array.sh` will be rewritten to use this pattern.
+
+**Note:** Research reported LSF 9.3.1 on DTU HPC; our earlier DTU docs read said 10. Both versions support job arrays — syntax identical.

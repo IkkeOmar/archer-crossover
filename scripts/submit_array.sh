@@ -1,93 +1,124 @@
 #!/usr/bin/env bash
-# submit_array.sh — submit one LSF job per (ticker, timeframe) combination to DTU HPC.
+# submit_array.sh — submit LSF job array of archer-crossover sweeps to DTU HPC.
 #
-# Run from a DTU HPC login node (login1.hpc.dtu.dk) after uploading the project:
+# Run from a DTU HPC login node after uploading the project:
 #     cd ~/archer-crossover
 #     bash scripts/submit_array.sh
 #
-# Each job runs:
-#     python3 -m src.sweep --ticker <T> --timeframe <TF> --grid-mode default
-# Output goes to:
-#     results/csv/<T>_<TF>.csv
-#     results/csv/<T>_<TF>_summary.json
-#     results/npz/<T>_<TF>_raw.npz
+# Pattern: native LSF job array (bsub -J "name[indexList]") with a params.tsv
+# row per (ticker, timeframe) combination. The cluster scheduler groups them
+# under one job-name for easy monitoring (bjobs -J "sweep[*]") and supports
+# wait dependencies (bsub -w "done(sweep)").
 #
 # Resource notes (DTU HPC, queue 'hpc'):
-#   - 4 cores per job (vectorized numpy uses BLAS threads)
-#   - 8 GB memory per job
-#   - 2 hour walltime per job
-#   - Max 100 concurrent jobs per user in 'hpc' queue
+#   - 4 cores per job (numpy + BLAS threading)
+#   - 8 GB memory per process (LSF: -M 8388608 KB)
+#   - 2-hour walltime per job (max 72h on hpc queue)
+#   - All cores on one node (span[hosts=1] for NUMA performance)
 
 set -euo pipefail
 
 # ---------------- configuration ----------------
 
-# Module: try python3 first, fall back to anaconda3
-PY_MODULE="python3"
-if ! module is-available python3 2>/dev/null; then
-  PY_MODULE="anaconda3"
-fi
-
 QUEUE="hpc"
 N_CORES=4
-MEM_GB=8
+MEM_PER_PROC_KB=8388608  # 8 GB in KB
 WALLTIME="02:00"
+JOB_NAME="sweep"
 
-TICKERS=(
-  "SPY" "QQQ" "IWM" "AAPL" "GOOGL"
-  "BTC-USD" "ETH-USD" "GLD" "SLV"
-)
+# Module: prefer python3, fall back to anaconda3
+if module is-available python3 2>/dev/null; then
+  PY_MODULE="python3"
+elif module is-available anaconda3 2>/dev/null; then
+  PY_MODULE="anaconda3"
+else
+  echo "ERROR: neither python3 nor anaconda3 module available"
+  exit 1
+fi
 
 # Per-asset-class timeframe lists.
-# yfinance limits: 1m=7d, 2m=60d, 5m=60d, 15m=60d, 1h=730d, 1d=10y+
-# We'll keep Phase 1 to timeframes that have meaningful history.
+# yfinance limits: 1m=7d, 2m/5m/15m=60d, 1h=730d, 1d=10y+
+# Crypto via ccxt can go further back, but Phase 1 keeps stock/crypto parity.
 STOCK_TIMEFRAMES=("1d" "1h")
 CRYPTO_TIMEFRAMES=("1d" "1h" "15m")
 
 # ---------------- ensure deps installed once ----------------
 
-echo "Installing dependencies (once) ..."
+mkdir -p results/logs results/csv results/npz
 module load "$PY_MODULE" 2>/dev/null || true
+echo "Installing dependencies (once) ..."
 pip install --quiet --user -r requirements.txt || pip install --quiet -r requirements.txt
 
-# ---------------- submit jobs ----------------
+# ---------------- build params.tsv ----------------
 
-SUBMITTED=0
-for T in "${TICKERS[@]}"; do
+PARAMS_FILE="results/params.tsv"
+echo -e "ticker\ttimeframe" > "$PARAMS_FILE"
+
+N=0
+for T in SPY QQQ IWM AAPL GOOGL BTC-USD ETH-USD GLD SLV; do
   if [[ "$T" == *"-USD"* ]]; then
     TIMEFRAMES=("${CRYPTO_TIMEFRAMES[@]}")
   else
     TIMEFRAMES=("${STOCK_TIMEFRAMES[@]}")
   fi
   for TF in "${TIMEFRAMES[@]}"; do
-    JOBNAME="archer_${T}_${TF}"
-    OUT="results/logs/${JOBNAME}_%J.out"
-    ERR="results/logs/${JOBNAME}_%J.err"
-    mkdir -p results/logs
-    echo "Submitting: ${JOBNAME} (${N_CORES} cores, ${MEM_GB}GB, ${WALLTIME})"
-    bsub \
-      -q "$QUEUE" \
-      -J "$JOBNAME" \
-      -n "$N_CORES" \
-      -R "span[hosts=1]" \
-      -R "rusage[mem=${MEM_GB}GB]" \
-      -M "${MEM_GB}GB" \
-      -W "$WALLTIME" \
-      -o "$OUT" \
-      -e "$ERR" \
-      <<EOF
+    echo -e "$T\t$TF" >> "$PARAMS_FILE"
+    N=$((N + 1))
+  done
+done
+
+echo "Built $PARAMS_FILE with $N (ticker, timeframe) combinations"
+cat "$PARAMS_FILE"
+
+# ---------------- submit job array ----------------
+
+echo
+echo "Submitting job array 'sweep[1-$N]' to queue '$QUEUE' (${N_CORES} cores, ${MEM_PER_PROC_KB} KB mem, $WALLTIME walltime)"
+
+bsub -q "$QUEUE" \
+  -J "${JOB_NAME}[1-${N}]" \
+  -n "$N_CORES" \
+  -R "span[hosts=1]" \
+  -R "rusage[mem=${MEM_PER_PROC_KB}]" \
+  -M "$MEM_PER_PROC_KB" \
+  -W "$WALLTIME" \
+  -o "results/logs/${JOB_NAME}_%J_%I.out" \
+  -e "results/logs/${JOB_NAME}_%J_%I.err" \
+  <<EOF
 #!/bin/sh
+#BSUB -q $QUEUE
+#BSUB -J ${JOB_NAME}[\$LSB_JOBINDEX]
+#BSUB -n $N_CORES
+#BSUB -R "span[hosts=1]"
+#BSUB -R "rusage[mem=${MEM_PER_PROC_KB}]"
+#BSUB -M $MEM_PER_PROC_KB
+#BSUB -W $WALLTIME
+#BSUB -o results/logs/${JOB_NAME}_%J_%I.out
+#BSUB -e results/logs/${JOB_NAME}_%J_%I.err
+
 module load $PY_MODULE
 export OMP_NUM_THREADS=$N_CORES
 export MKL_NUM_THREADS=$N_CORES
 export OPENBLAS_NUM_THREADS=$N_CORES
+
 cd "\$HOME/archer-crossover"
-python3 -m src.sweep --ticker "$T" --timeframe "$TF" --grid-mode default
+
+# Read this job's parameters from params.tsv
+ROW=\$(sed -n "\${LSB_JOBINDEX}p" results/params.tsv)
+TICKER=\$(echo "\$ROW" | cut -f1)
+TIMEFRAME=\$(echo "\$ROW" | cut -f2)
+
+echo "[\$(date)] Job \$LSB_JOBINDEX: ticker=\$TICKER timeframe=\$TIMEFRAME"
+
+python3 -m src.sweep \\
+  --ticker "\$TICKER" \\
+  --timeframe "\$TIMEFRAME" \\
+  --grid-mode default
+
+# Completion sentinel
+touch results/.done_\${LSB_JOBINDEX}
 EOF
-    SUBMITTED=$((SUBMITTED + 1))
-  done
-done
 
 echo
-echo "Submitted $SUBMITTED jobs. Monitor with: bjobs"
-echo "After all complete, aggregate with: python3 -m src.report --in results/csv --out paper/"
+echo "Done. Monitor: bjobs -J \"${JOB_NAME}[*]\""
+echo "Wait for all:  bsub -w \"ended(${JOB_NAME}[*])\" -o results/logs/aggregate.out -e results/logs/aggregate.err 'python3 -m src.report'"
