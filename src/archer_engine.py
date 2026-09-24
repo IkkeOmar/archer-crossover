@@ -265,14 +265,23 @@ def backtest_arrows(
         if position[t] != last_pos_size:
             # Close existing position at close[t]
             if last_pos_size > 0:
-                # Was long: sell long_units at price[t]
-                cash += long_units * prices[t]
+                # Was long: sell long_units at price[t].
+                # Pay exit cost on the sold notional.
+                sale_notional = long_units * prices[t]
+                cost_close = sale_notional * cost_rate
+                cash += sale_notional - cost_close
                 long_units = 0.0
             elif last_pos_size < 0:
-                # Was short: buy back short_units at price[t]
+                # Was short: buy back short_units to close.
+                # We pay current_price * units, but receive back the borrowed
+                # value (units * entry_price). Net cash flow = (entry - current) * units.
+                # Plus entry/exit costs (cost already paid at entry; we add exit cost now).
                 cost_close = short_units * prices[t] * cost_rate
-                cash -= short_units * prices[t]
-                cash -= cost_close
+                # Cash at this moment equals (sale_proceeds - entry_cost).
+                # Realized short PnL: (entry_price - current_price) * short_units.
+                # Add realized PnL to cash, subtract exit cost.
+                realized_pnl = (short_entry_price - prices[t]) * short_units
+                cash += realized_pnl - cost_close
                 short_units = 0.0
                 short_entry_price = 0.0
 
@@ -285,13 +294,18 @@ def backtest_arrows(
                     long_units = (target_notional - cost) / prices[t]
                     cash -= target_notional
             elif position[t] < 0:
-                # Go short: borrow units, receive cash
+                # Go short: borrow units, sell for cash.
+                # Accounting model: cash represents the proceeds from selling
+                # the borrowed units. When we later buy them back (exit), cash
+                # grows by the price difference (or shrinks if price rose).
+                # Equity = cash + short_pnl where short_pnl = units * (entry - current).
                 target_notional = abs(position[t]) * cash
                 if target_notional > 0:
-                    cost = target_notional * cost_rate
-                    short_units = (target_notional - cost) / prices[t]
+                    short_units = target_notional / prices[t]
+                    sale_proceeds = short_units * prices[t]
+                    cost = sale_proceeds * cost_rate
+                    cash = sale_proceeds - cost  # replace cash with proceeds
                     short_entry_price = prices[t]
-                    cash += short_units * prices[t] - cost
             last_pos_size = position[t]
 
         # Mark-to-market
@@ -359,7 +373,9 @@ def sweep_arrows(
     n_trades_out = np.zeros(shape, dtype=np.int32)
     n_skipped_out = np.zeros(shape, dtype=np.int32)
 
-    returns = np.diff(prices) / prices[:-1]
+    # Per-candle returns: (p[t+1] - p[t]) / p[t]. Guard against zero prices.
+    safe_prices = np.where(prices == 0, np.nan, prices)
+    returns = np.diff(safe_prices) / safe_prices[:-1]
     returns = np.concatenate(([0.0], returns))  # align length with prices
 
     for i, n_mu in enumerate(n_mu_grid):
@@ -380,17 +396,25 @@ def sweep_arrows(
                     eq = result.equity
                     if len(eq) < 2:
                         continue
-                    eq_returns = np.diff(eq) / eq[:-1]
+                    # Per-bar equity returns. Guard against zero/negative equity
+                    # (which would cause division-by-zero or sign flips).
+                    safe_eq = np.where(eq <= 0, np.nan, eq)
+                    eq_returns = np.diff(safe_eq) / safe_eq[:-1]
+                    eq_returns = np.where(np.isnan(eq_returns), 0.0, eq_returns)
                     eq_returns = np.concatenate(([0.0], eq_returns))
-                    # Sharpe
-                    if eq_returns.std() > 0:
+                    # Sharpe: requires nonzero std; ignore NaN positions.
+                    valid_returns = eq_returns[~np.isnan(eq_returns)]
+                    if len(valid_returns) > 1 and valid_returns.std() > 0:
                         sharpe_out[i, j, k, l] = (
-                            eq_returns.mean() / eq_returns.std() * math.sqrt(periods_per_year)
+                            valid_returns.mean() / valid_returns.std() * math.sqrt(periods_per_year)
                         )
-                    # CAGR
-                    if eq[0] > 0 and eq[-1] > 0:
+                    # CAGR: requires positive endpoints and years > 0.
+                    if eq[0] > 0 and eq[-1] > 0 and n_periods > 0:
                         years = n_periods / periods_per_year
-                        cagr_out[i, j, k, l] = (eq[-1] / eq[0]) ** (1.0 / years) - 1.0
+                        if years > 0:
+                            ratio = eq[-1] / eq[0]
+                            if ratio > 0:
+                                cagr_out[i, j, k, l] = ratio ** (1.0 / years) - 1.0
                     # Max DD
                     running_max = np.maximum.accumulate(eq)
                     dd = eq / running_max - 1.0
