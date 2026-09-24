@@ -233,15 +233,13 @@ def load_one(
         except Exception as e:
             print(f"  CDD failed for {cdd_symbol} {timeframe}: {e}, falling back to ccxt")
 
+    # Prefer the largest cached file (full history > small suffix-less file)
     cache_key = f"{_sanitize_ticker(ticker)}_{timeframe}"
-    if start:
-        cache_key += f"_{start}"
-    if end:
-        cache_key += f"_{end}"
-    cache_path = DATA_DIR / f"{cache_key}.csv"
-
-    if cache_path.exists() and not force_refresh:
-        df = pd.read_csv(cache_path, parse_dates=["date"], index_col="date")
+    candidates = sorted(DATA_DIR.glob(f"{cache_key}*.csv"))
+    if candidates and not force_refresh:
+        # Pick the largest by file size (heuristic: more data = bigger file)
+        best = max(candidates, key=lambda p: p.stat().st_size)
+        df = pd.read_csv(best, parse_dates=["date"], index_col="date")
         return df
 
     if _is_crypto_ticker(ticker):
@@ -254,6 +252,7 @@ def load_one(
     else:
         df = fetch_yfinance(ticker, timeframe, start=start, end=end)
 
+    cache_path = DATA_DIR / f"{cache_key}.csv"
     df.to_csv(cache_path)
     return df
 
@@ -268,9 +267,11 @@ def fetch_cryptodatadownload(
     No rate limits, no API key, full multi-year history in one HTTP GET.
     Source: https://www.cryptodatadownload.com/data/<exchange>/<symbol>_<timeframe>.csv
 
+    Note: CDD uses 'd' (lowercase) for daily, '1h' for hourly.
     Returns DataFrame indexed by date with columns: open, high, low, close, volume.
     """
-    url = f"https://www.cryptodatadownload.com/cdd/{exchange_dir.capitalize()}_{symbol}_{timeframe}.csv"
+    tf_for_url = 'd' if timeframe == '1d' else timeframe
+    url = f"https://www.cryptodatadownload.com/cdd/{exchange_dir.capitalize()}_{symbol}_{tf_for_url}.csv"
     cache_path = DATA_DIR / f"{symbol}_{timeframe}_{exchange_dir}.csv"
     if cache_path.exists():
         age_h = (time.time() - cache_path.stat().st_mtime) / 3600
@@ -280,7 +281,6 @@ def fetch_cryptodatadownload(
 
     # CDD format: row 0 is attribution URL, row 1 is the header
     df = pd.read_csv(url, skiprows=1)
-    # Columns: Unix,Date,Symbol,Open,High,Low,Close,Volume Base,Volume Quote,tradecount
     rename = {"Date": "date", "Open": "open", "High": "high", "Low": "low", "Close": "close"}
     vol_cols = [c for c in df.columns if c.startswith("Volume")]
     if vol_cols:
