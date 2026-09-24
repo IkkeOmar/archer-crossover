@@ -306,6 +306,49 @@ The $(n_\mu=35\text{--}50, x=0.0\text{--}0.25)$ region produces MaxDD as severe 
 \end{itemize}
 
 % ============================================================
+\section{Statistical Caveats}
+
+The headline numbers in this paper come from a structured search over parameter space on a single sample. Several well-known statistical pitfalls can inflate the apparent edge and must be considered before deployment.
+
+\subsection{Multiple comparisons}
+
+We sweep 270 parameter combinations per ticker and report the best on 12 metrics. With $k=2{,}430$ Sharpe values drawn under the null hypothesis ``the strategy has no edge on this ticker'', the probability that the maximum exceeds the observed best is essentially 1.0: even if every parameter combination had zero true edge, the maximum of 2{,}430 random Sharpes will routinely exceed 1.5. The reported ``median Sharpe 0.83'' is more defensible than the ``best Sharpe 1.21'' precisely because the median is insensitive to extreme outliers. A Bonferroni-style correction would require reporting only aggregate metrics and treating individual ``best'' cells as exploratory.
+
+\subsection{Post-hoc parameter selection}
+
+The cross-ticker sweet spot $(n_\mu=1, x=1.0)$ was identified \emph{after} running the sweep on the data we report. Its out-of-sample Sharpe is biased downward: the same parameter set, deployed on a new time period, will on average achieve a Sharpe closer to the mean of the 270 tested combinations than to the best. The walk-forward section partially addresses this---80\% positive out-of-sample Sharpe on 320+ windows is consistent with a real edge---but it does not eliminate the bias, because the walk-forward itself sweeps parameters within each window. The honest framing: \emph{vanilla EMA-cross is what the data prefers, not what we expect to generalize best}.
+
+\subsection{Sharpe ratio bias for short samples}
+
+The annualised Sharpe ratio is biased upward when computed on samples with fewer than $\sim$5 years of data. Lo (2002) shows the bias scales as $\text{bias}(\hat{S}) \approx \frac{\gamma}{4T}$ where $T$ is the sample length in years and $\gamma$ is the kurtosis. For our 10-year sample with kurtosis $\sim$7 (typical for daily equity returns), the bias is $\sim$0.17---meaning a measured Sharpe of 1.0 corresponds to a true Sharpe of $\sim$0.83. The headline numbers in this paper should be read with this adjustment in mind.
+
+\subsection{Sample size}
+
+We report statistics over 9 tickers. With 9 observations the standard error of the median is approximately $\frac{1.25\,\sigma}{\sqrt{9}} \approx 0.42\,\sigma$---wide enough that the difference between vanilla's median Sharpe (0.81) and Archer-specific's (0.83) is not statistically significant. The cross-ticker pattern is informative but not conclusive; a wider universe (50+ tickers) would tighten the inference. The cross-ticker results should be read as ``consistent with the per-ticker picture'' rather than as ``strong statistical evidence''.
+
+\subsection{Survivorship and look-ahead bias}
+
+All 9 tickers were chosen because they existed in 2024 and have continuous data going back. This is survivorship bias: tickers that delisted (Lehman Brothers, Mt.\ Gox-style crypto failures, regional bank failures) are excluded. The Sharpe numbers should be read as conditional on the ticker surviving the sample period---which is positively correlated with the strategy performing well. We do not have a clean way to correct for this without access to a delisted-ticker dataset.
+
+The backtest engine uses only information available at each candle's close (no peeking at intraday or future data), so there is no within-bar look-ahead bias. But the parameter sweep itself is a form of look-ahead: the optimal $(n_\mu, x)$ for the sample period is known after the fact.
+
+\subsection{Regime dependence}
+
+The 2015--2024 window contains two major crypto bear markets (2018, 2022), the COVID crash (March 2020), and a sustained equity bull market. Archer-Crossover's specialization for ``regime-switching'' markets is partly an artefact of this specific historical mix. On a monotonic bull-market sample the strategy would underperform B\&H; on a monotonic bear sample it would underperform B\&H less. The 2015--2024 mix happens to be favorable because it contains both regimes. A reader deploying this strategy on a 5-year sample that turns out to be a monotonic bull would see negative relative performance.
+
+\subsection{Median vs mean}
+
+We use median over tickers throughout. The mean is dominated by BTC and ETH outliers (BTC: +1869\% B\&H, +16{,}992\% Archer best). Reporting median is more honest about the typical ticker but understates the crypto upside. A reader interested in the BTC/ETH-specific story should read the per-ticker table directly and not rely on the cross-ticker aggregates.
+
+\subsection{Cost model}
+
+Transaction costs are modeled as a flat 5 bps per side, applied to notional traded. Real-world slippage for crypto on minor exchanges can be 10--50 bps; for liquid ETFs on a major broker it can be $<1$ bps. The 5 bps figure is a reasonable middle estimate. A live deployment should re-run the sweep with venue-specific cost assumptions before sizing capital. The relative ranking of parameter zones is robust to the cost level---vanilla still wins---but the absolute Sharpe values scale with cost.
+
+\subsection{What ``Robust Sharpe'' does and does not prove}
+
+The Robust-Sharpe ratio (mean / std across 100 delay reseeds) exceeds 56 for all tickers. This proves that \emph{the same parameter set produces a consistent Sharpe across different delay randomisations}---which is a stability test, not an out-of-sample test. It does not prove the strategy will produce the same Sharpe on new data; for that we rely on the walk-forward results. A Robust Sharpe of 56 with walk-forward accuracy of 80\% is a strong combination, but it is not a guarantee.
+
+% ============================================================
 \section{Conclusion}
 
 The Archer-Crossover strategy adds a stochastic delay to the standard EMA-cross signal. Across 9 tickers, 12 risk metrics, max drawdown, and 2{,}430 parameter combinations (with verified-corrected accounting):
