@@ -162,14 +162,14 @@ The default-grid (which includes \(x=1.0\) vanilla) selects \((n_\mu=1, x=1.0, \
 \begin{figure}[h!]
 \centering
 \begin{subfigure}{0.48\textwidth}
-\includegraphics[width=\textwidth]{../results/plots/equity/equity_SPY_1d.png}
+\includegraphics[width=\textwidth]{../results/plots/equity/equity_SPY_1d_log.png}
 \caption{SPY 2015--2024}
 \end{subfigure}
 \begin{subfigure}{0.48\textwidth}
-\includegraphics[width=\textwidth]{../results/plots/equity/equity_BTC-USD_1d.png}
-\caption{BTC-USD 2018--2024}
+\includegraphics[width=\textwidth]{../results/plots/equity/equity_BTC-USD_1d_log.png}
+\caption{BTC-USD 2018--2024 (log scale)}
 \end{subfigure}
-\caption{Equity curves: Archer (n=3, x=0.75) vs. vanilla EMA-cross (9/21) vs. buy-and-hold. On SPY, Archer achieves +254\% return vs. +186\% for buy-and-hold, but with higher drawdown volatility. On BTC-USD, vanilla dominates because of the strong 2018--2024 uptrend.}
+\caption{Equity curves on linear (left) and log (right) scale: Archer (n=3, x=0.75) vs.\ vanilla EMA-cross (9/21) vs.\ buy-and-hold. \textbf{The log-scale view is essential for fair comparison when returns span orders of magnitude.} On SPY, Archer achieves +254\% return vs.\ +186\% for buy-and-hold. On BTC-USD, vanilla reaches +2637\% on a linear scale but the \emph{log scale} reveals that this is essentially the same trajectory as buy-and-hold (+578\%): vanilla rides the BTC megatrend but does not generate alpha beyond the trend itself. The strategy spends 46\% of candles short (capturing the 2018 and 2022 bear markets) and 52\% long (capturing the 2020--21 and 2023--24 bull runs).}
 \end{figure}
 
 \subsection{Monte Carlo Robust-Sharpe analysis}
