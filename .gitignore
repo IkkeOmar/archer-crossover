@@ -1,0 +1,26 @@
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# Cached data (large, regenerable)
+data/*.csv
+data/*.parquet
+
+# Results
+results/*.npz
+results/*.csv
+
+# LaTeX build artifacts
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.toc
+
+# Editor
+.vscode/
+.idea/
+*.swp
+.DS_Store
