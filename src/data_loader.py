@@ -225,6 +225,14 @@ def load_one(
     Returns:
         DataFrame with columns: open, high, low, close, volume.
     """
+    # Try CryptoDataDownload first for crypto pairs (fast, full history, no rate limit)
+    if _is_crypto_ticker(ticker) and timeframe in ("1h", "1d"):
+        cdd_symbol = _yfinance_ticker(ticker).replace("-USD", "USDT").replace("/", "")
+        try:
+            return fetch_cryptodatadownload(cdd_symbol, timeframe)
+        except Exception as e:
+            print(f"  CDD failed for {cdd_symbol} {timeframe}: {e}, falling back to ccxt")
+
     cache_key = f"{_sanitize_ticker(ticker)}_{timeframe}"
     if start:
         cache_key += f"_{start}"
@@ -246,6 +254,43 @@ def load_one(
     else:
         df = fetch_yfinance(ticker, timeframe, start=start, end=end)
 
+    df.to_csv(cache_path)
+    return df
+
+
+def fetch_cryptodatadownload(
+    symbol: str,        # e.g. 'BTCUSDT', 'ETHUSDT'
+    timeframe: str,     # '1h' or '1d'
+    exchange_dir: str = "binance",
+) -> pd.DataFrame:
+    """Fetch pre-bundled OHLCV CSV from CryptoDataDownload.com.
+
+    No rate limits, no API key, full multi-year history in one HTTP GET.
+    Source: https://www.cryptodatadownload.com/data/<exchange>/<symbol>_<timeframe>.csv
+
+    Returns DataFrame indexed by date with columns: open, high, low, close, volume.
+    """
+    url = f"https://www.cryptodatadownload.com/cdd/{exchange_dir.capitalize()}_{symbol}_{timeframe}.csv"
+    cache_path = DATA_DIR / f"{symbol}_{timeframe}_{exchange_dir}.csv"
+    if cache_path.exists():
+        age_h = (time.time() - cache_path.stat().st_mtime) / 3600
+        if age_h < 24:
+            df = pd.read_csv(cache_path, parse_dates=["date"], index_col="date")
+            return df
+
+    # CDD format: row 0 is attribution URL, row 1 is the header
+    df = pd.read_csv(url, skiprows=1)
+    # Columns: Unix,Date,Symbol,Open,High,Low,Close,Volume Base,Volume Quote,tradecount
+    rename = {"Date": "date", "Open": "open", "High": "high", "Low": "low", "Close": "close"}
+    vol_cols = [c for c in df.columns if c.startswith("Volume")]
+    if vol_cols:
+        rename[vol_cols[0]] = "volume"
+    df = df.rename(columns=rename)
+    df["date"] = pd.to_datetime(df["date"], format="mixed")
+    df = df.set_index("date")[["open", "high", "low", "close", "volume"]]
+    df = df.sort_index()
+    df = df[~df.index.duplicated(keep="first")]
+    df.index.name = "date"
     df.to_csv(cache_path)
     return df
 
