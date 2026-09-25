@@ -39,6 +39,9 @@
 \noindent We introduce \textbf{Archer-Crossover}, a momentum strategy that augments an EMA-crossover signal with a stochastic delay sampled from $\mathcal{N}(n_\mu, \sigma_n)$, with probability $x$ of zero delay. We validate on 9 liquid tickers (2015--2024, 1d) across 12 risk metrics, with corrected accounting verified by 11 unit tests. \textbf{The vanilla EMA-cross ($n_\mu=1$, $x=1.0$, \texttt{bear\_alloc}=1.0$) is the best mean-Sharpe parameterization for 7 of 9 tickers} (median Sharpe 0.76) and has the lowest median max drawdown ($-47.5\%$, only $-5.2$ pp worse than buy-and-hold). Archer-specific delay ($n_\mu=3$, $x=0.5$) is best for Calmar and recovery factor, and BTC-USD prefers $n_\mu=12$, $x=0.25$ (Sharpe 1.21, return $+16{,}992$\%). The correlation matrix of 12 metrics reveals Sharpe is essentially uncorrelated with win rate ($r=0.02$) but correlated with payoff ratio ($r=0.77$). Monte-Carlo Robust-Sharpe (56--98) and walk-forward validation (80\% positive out-of-sample Sharpe) confirm the edge is structural. We identify a \emph{catastrophic MaxDD zone} at $n_\mu \geq 35$ with low $x$ that should be avoided.
 \end{abstract}
 
+\tableofcontents
+\newpage
+
 % ============================================================
 \section{Introduction}
 
