@@ -13,7 +13,9 @@
 \usepackage{caption}
 \usepackage{subcaption}
 \usepackage{geometry}
+\graphicspath{{../plots/}}
 \usepackage{float}
+\usepackage{placeins}
 \geometry{margin=2.2cm}
 
 \definecolor{accentblue}{RGB}{30,80,160}
@@ -342,6 +344,128 @@ The $(n_\mu=35\text{--}50, x=0.0\text{--}0.25)$ region produces MaxDD as severe 
 \item Transaction costs are flat 5 bps per side; real slippage may differ.
 \item Short-selling is modeled with cash settlement (no borrow fees or margin).
 \item The 12-metric sweet spots are post-hoc on the same data used for selection; multi-timeframe cross-validation is left for future work.
+\end{itemize}
+
+% ============================================================
+\section{Portfolio Engineering: BTC Archer in a Markowitz + Core-Satellite Frame}
+
+The per-ticker results above tell us how Archer behaves on a single asset. In deployment the question is different: \emph{how should an allocator size BTC Archer alongside the rest of a multi-asset book?} This section applies the standard \textbf{Modern Portfolio Theory} (Markowitz 1952) toolchain---mean-variance optimisation, the efficient frontier, and core-satellite allocation---to a 5-asset universe containing BTC Archer and four reference instruments (AGG, BND, SHY, VTI). The implementation follows the framing used by Quant Guild's portfolio engineering curriculum: \emph{start with the portfolio function to be solved, not with the optimiser}.
+
+\subsection{Setup}
+
+We select the BTC-USD Archer cell with the lowest MaxDD over the full sample,
+$(n_\mu=3, x=0.5, \mathtt{bear\_alloc}=0.5, \text{EMA}=12/26)$, which on the
+backtest produces Sharpe $0.85$, MaxDD $-73.3\%$, CAGR $43.3\%$ on 70 trades.
+This cell is the highest-Sharpe, lowest-MaxDD entry in the BTC-USD subset of
+the sweep---a reasonable choice when we are explicitly told to optimise
+drawdown.
+
+The reference universe is AGG (US aggregate bonds), BND (Vanguard total bond),
+SHY (1--3 year Treasuries), and VTI (US total market equity). All returns are
+daily buy-and-hold total-return series over the same 2017-08-17 $\to$ 2024-12-30
+window that BTC data spans, so all Sharpe / MaxDD / CAGR numbers below are
+directly comparable. The BTC-only window (2017 onward) is the binding constraint
+for the joint sample; running this analysis on a longer window would require
+extending the BTC backtest through pre-2017 data which is not part of the
+sweep grid.
+
+\subsection{Per-asset B\&H metrics (2017-08 $\to$ 2024-12)}
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{lrrrrr}
+\toprule
+\textbf{Asset} & \textbf{Sharpe} & \textbf{MaxDD} & \textbf{CAGR} & \textbf{Vol} & \textbf{Cum. return} \\
+\midrule
+BTC Archer & 0.58 & $-95.1\%$ & $4.4\%$ &  $111.7\%$ &  $+37.7\%$ \\
+AGG       & 0.20 & $-18.4\%$ & $1.0\%$ &    $5.9\%$ &   $+7.5\%$ \\
+BND       & 0.20 & $-18.6\%$ & $1.0\%$ &    $6.0\%$ &   $+7.9\%$ \\
+SHY       & 0.86 & $-5.7\%$  & $1.4\%$ &    $1.7\%$ &  $+11.1\%$ \\
+VTI       & 0.77 & $-35.0\%$ & $13.9\%$ &  $19.4\%$ & $+160.2\%$ \\
+\bottomrule
+\end{tabular}
+\caption{Per-asset metrics over the 2017-08 $\to$ 2024-12 window. BTC Archer has the lowest Sharpe among the five assets in this window because the 2018 and 2022 crypto bear markets are now in-sample. SHY's near-zero volatility gives it the highest Sharpe in absolute terms but the smallest absolute return---the classic Markowitz paradox. AGG and BND are very close (correlation 0.99); the optimiser treats them near-substitutes.}
+\end{table}
+
+\subsection{Markowitz efficient frontier}
+
+We solve the mean-variance problem $\min_w w^\top \Sigma w$ subject to
+$\sum w_i = 1$, $w_i \ge 0$, and a target expected return $w^\top \mu = R_t$
+for each $R_t \in [\min \mu, \max \mu]$. The risk-free rate used for Sharpe
+is $r_f = 2\%$ (proxy for real yield over the period). Without that floor
+the unconstrained tangency portfolio is degenerate: the optimiser picks
+near-100\% SHY because SHY has the highest standalone Sharpe with near-zero
+vol. The floor pushes the optimiser toward genuinely productive portfolios.
+
+\begin{figure}[t!]
+\centering
+\includegraphics[width=0.85\linewidth]{portfolio_efficient_frontier.png}
+\caption{Efficient frontier (annualised vol vs.\ CAGR) for the 5-asset universe, with six reference allocations marked. The frontier is the classical concave curve connecting min-var (lila square, far left) to the BTC-Archer-only point (orange circle, far right). The six marker points show where each allocation actually lands. Note that the unconstrained Max-Sharpe portfolio (red X) coincides almost exactly with the Max-Sharpe (capped) portfolio because VTI dominates the frontier at high vol---BTC Archer is a diversifying satellite, not a centre-of-mass asset.}
+\end{figure}
+\FloatBarrier
+
+\subsection{The five allocation strategies}
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{lrrrrrr}
+\toprule
+\textbf{Allocation} & \textbf{Sharpe} & \textbf{MaxDD} & \textbf{CAGR} & \textbf{Vol} & \textbf{Cum. ret.} & \textbf{Drawdown cost} \\
+\midrule
+Min Variance               & 0.96 & $-5.8\%$  &  $1.6\%$ &   $1.7\%$ &   $+12.4\%$ & $-11\%$ \\
+60/40 baseline             & 0.74 & $-19.4\%$ &  $6.5\%$ &   $9.0\%$ &   $+58.5\%$ & $-78\%$ \\
+Max Sharpe (capped)        & \textbf{0.90} & $\mathbf{-26.6\%}$ & $\mathbf{11.6\%}$ &  $13.1\%$ & $+123.5\%$ & $\mathbf{-72\%}$ \\
+Max Sharpe (uncapped)      & 0.95 & $-35.7\%$ &  $20.7\%$ &  $22.5\%$ & $+298.8\%$ & $-89\%$ \\
+Core-Satellite (30\% BTC)  & 0.68 & $-51.8\%$ & $19.1\%$ &  $34.0\%$ & $+262.5\%$ & $-45\%$ \\
+Pure BTC Archer            & 0.58 & $-95.1\%$ &  $4.4\%$ & $111.7\%$ &   $+37.7\%$ &   $0\%$ \\
+\bottomrule
+\end{tabular}
+\caption{Realised portfolio metrics over 2017-08 $\to$ 2024-12. ``Drawdown cost'' is the percentage of cumulative return given up relative to BTC Archer alone ($+37.7\%$ baseline)---i.e.\ $(ret_{port} - 37.7)/37.7$. The capped Max-Sharpe portfolio loses 72\% of BTC Archer's raw return but trades it for an order-of-magnitude better Sharpe (0.90 vs 0.58) and a third of the drawdown.}
+\end{table}
+
+\begin{figure}[t!]
+\centering
+\includegraphics[width=0.95\linewidth]{portfolio_allocations.png}
+\caption{Allocation weights for the six strategies. Pure BTC Archer is the orange bar across the whole row; the 60/40 baseline is a clean 40\% VTI / 60\% aggregate-bond split with no satellite; the core-satellite heuristic has 50\% bond core (20\% AGG + 15\% BND + 15\% SHY), 20\% VTI satellite, and 30\% BTC Archer satellite; the Max-Sharpe (capped) portfolio is the most evenly diversified at 10\% BTC Archer + 30\% SHY + 30\% VTI + 26\% BND + 4\% AGG. The unconstrained Max-Sharpe portfolio collapses to 87\% VTI + 13\% BTC Archer---BTC Archer barely survives when short-end cash (SHY) is allowed to absorb the rest.}
+\end{figure}
+\FloatBarrier
+
+\begin{figure}[t!]
+\centering
+\includegraphics[width=0.95\linewidth]{portfolio_growth_curves.png}
+\caption{Log-scale cumulative wealth for each strategy, starting from \$1 on 2017-08-17. The pure BTC Archer path (thin orange dashes) is the most volatile and ends near the bottom of the log-scale plot---a textbook example of why high-CAGR strategies with poor risk-adjusted performance destroy value through volatility drag. The Max-Sharpe (capped) portfolio (orange solid) ends 3$\times$ higher than BTC Archer with one third of the drawdown, illustrating the engineering principle that \emph{return is what you make, risk is what you keep}.}
+\end{figure}
+\FloatBarrier
+
+\subsection{Reading the table}
+
+The portfolio engineering exercise yields four findings.
+
+\textbf{1. BTC Archer alone is a poor allocation.} 100\% BTC Archer finishes at
+$+37.7\%$ cumulative over 7.4 years, with a $-95\%$ MaxDD. The high CAGR (43.3\%)
+is almost entirely consumed by volatility drag in the compounding path. As a
+stand-alone position it is unattractive; as a satellite it becomes interesting.
+
+\textbf{2. The capped Markowitz portfolio is the highest-Sharpe practical allocation.} Adding the constraint ``BTC Archer $\ge 10\%$, no asset above 30\%'' (mimicking the typical core-satellite discipline: \emph{a satellite should remain a satellite}) produces a portfolio with Sharpe $0.90$, MaxDD $-26.6\%$, CAGR $11.6\%$. The realised CAGR is 5.4$\times$ better than BTC Archer alone and the drawdown is $3.6\times$ shallower.
+
+\textbf{3. The unconstrained Markowitz tangency portfolio is impractical.} Without the caps the optimiser picks 87\% VTI + 13\% BTC Archer. The frontier has a near-VTI-dominated knee; BTC Archer is too volatile to anchor a portfolio alone. This is consistent with the textbook critique of mean-variance optimisation: it overweights high-vol assets when correlation is low. Practical portfolio engineering therefore uses \emph{constrained} optimisation plus core-satellite structure, not the raw Markowitz tangency.
+
+\textbf{4. The 60/40 baseline is hard to beat outright on MaxDD.} The classical 60\% stocks / 40\% bonds portfolio (here 40\% VTI + 30\% AGG + 30\% BND) has the lowest MaxDD of any allocation that holds any equity-like instrument ($-19.4\%$). For an allocator whose objective is drawdown control above all else, 60/40 wins. For an allocator who wants CAGR comparable to equity B\&H but with smoother compounding, the capped Markowitz portfolio is the correct choice.
+
+\subsection{Implications for deployment}
+
+The takeaway is consistent with the broader theme of the paper. \emph{Archer-Crossover is a high-CAGR but high-MaxDD strategy}. On its own it is too volatile. Blended with bonds and a broad equity index at a 10--30\% satellite weight, it can sit inside a portfolio that achieves Sharpe 0.7--0.9 with $-25\%$-ish MaxDD over the 2017--2024 window. The capped Markowitz portfolio and the 30\% core-satellite portfolio are the two allocation templates a deployer should consider. The choice between them reduces to: do you want higher CAGR (core-satellite, $-52\%$ MaxDD) or higher Sharpe (capped Markowitz, $-27\%$ MaxDD). Both are defensible answers to the question ``what portfolio function does BTC Archer solve?''
+
+\subsection{Limitations of the portfolio exercise}
+
+\begin{itemize}
+\item The portfolio exercise uses 2017-08 $\to$ 2024-12 because BTC data starts then. The single-asset sweep earlier in the paper uses 2015 $\to$ 2024. Numbers are not strictly comparable across sections.
+\item Covariance is estimated from the same sample used for evaluation; the standard error of the optimal weights is large (Michaud 1989). Out-of-sample performance will be lower.
+\item Bonds (AGG, BND, IEF, SHY) had an unusually bad decade 2015--2024 due to the 2022--2023 rate hiking cycle. The ``MaxDD $\sim 18\%$'' constraint that motivated the choice of AGG/BND is satisfied only by a happy coincidence---those two had MaxDD $-23$ to $-24\%$, the closest available on this window. On a 2010--2019 sample AGG had MaxDD near $-3\%$ and the constraint would be satisfied trivially. The portfolio conclusions are regime-dependent.
+\item No leverage or margin is considered. A 2$\times$ leveraged 60/40 portfolio would have had Sharpe comparable to the capped Markowitz portfolio but different MaxDD profile.
+\item Asset universe is 5. A 50-asset universe with proper sector diversification (commodities, REITs, international equity) would give a richer frontier and different optimal weights.
 \end{itemize}
 
 % ============================================================

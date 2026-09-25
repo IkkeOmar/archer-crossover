@@ -1,0 +1,74 @@
+PORTFOLIO ENGINEERING — BTC Archer + bonds + indexes (2015-2024)
+======================================================================
+
+BTC Archer cell used:
+  n_mu=3  x=0.5  bear=0.5  ema=12/26
+  Sharpe=0.855  MaxDD=-73.27%  CAGR=43.32%  trades=70
+
+Note on the 'MaxDD ~18%' constraint:
+  Over 2015-2024, bonds had an unusually bad decade (rate hikes 2022-23).
+  AGG/BND are the closest to the user's 18% target (MaxDD -23.4/-24.0%).
+  TLT -52%, IEF -27.7%, SHY -7.3%, VTI -35.0%, SPY -34.0%, QQQ -35.0%.
+  No equity index had MaxDD near -18% over this window.
+
+Per-asset B&H metrics (2015-2024):
+     asset  sharpe  max_dd  cagr   vol  total_return    n
+BTC_Archer   0.583  -0.951 0.044 1.118         0.377 1854
+       AGG   0.198  -0.184 0.010 0.059         0.075 1854
+       BND   0.202  -0.186 0.010 0.060         0.079 1854
+       SHY   0.861  -0.057 0.014 0.017         0.111 1854
+       IEF   0.051  -0.239 0.001 0.071         0.008 1854
+       VTI   0.766  -0.350 0.139 0.194         1.602 1854
+       SPY   0.804  -0.337 0.144 0.190         1.695 1854
+       QQQ   0.881  -0.351 0.197 0.236         2.763 1854
+
+MAX SHARPE:
+    BTC_Archer:  12.80%
+           AGG:   0.00%
+           BND:   0.00%
+           SHY:   0.00%
+           VTI:  87.20%
+
+MIN VARIANCE:
+    BTC_Archer:   0.01%
+           AGG:   0.00%
+           BND:   0.00%
+           SHY:  98.84%
+           VTI:   1.15%
+
+MAX SHARPE (capped BTC>=10%, max 30% per asset):
+    BTC_Archer:  10.00%
+           AGG:   3.88%
+           BND:  26.12%
+           SHY:  30.00%
+           VTI:  30.00%
+
+CORE-SATELLITE:
+    BTC_Archer:  30.00%
+           AGG:  20.00%
+           BND:  15.00%
+           SHY:  15.00%
+           VTI:  20.00%
+
+60/40:
+    BTC_Archer:   0.00%
+           AGG:  30.00%
+           BND:  30.00%
+           SHY:   0.00%
+           VTI:  40.00%
+
+PURE BTC ARCHER:
+    BTC_Archer: 100.00%
+           AGG:   0.00%
+           BND:   0.00%
+           SHY:   0.00%
+           VTI:   0.00%
+
+Realised portfolio backtest (2015-2024):
+allocation              cagr%    maxdd%    vol%  sharpe   cum_ret
+max_sharpe             20.69   -35.66  22.50    0.95    298.8%
+min_var                 1.60    -5.83   1.66    0.96     12.4%
+max_sharpe_capped      11.55   -26.62  13.07    0.90    123.5%
+core_satellite         19.13   -51.75  33.98    0.68    262.5%
+60_40                   6.46   -19.39   9.02    0.74     58.5%
+pure_btc_archer         4.44   -95.07 111.72    0.58     37.7%
