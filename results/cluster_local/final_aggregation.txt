@@ -1,0 +1,65 @@
+Loaded 14400 rows from 9 tickers × 1d
+
+=== bear_alloc dimension (mean in-sample Sharpe per ticker × bear_alloc) ===
+bear_alloc   0.00   0.25   0.50   0.75   1.00
+ticker                                       
+AAPL        0.771  0.478  0.588  0.720  0.837
+BTC-USD     0.906  0.747  0.773  0.859  0.946
+ETH-USD     0.846  0.784  0.813  0.888  0.957
+GLD         0.380  0.375  0.572  0.740  0.876
+GOOGL       0.515  0.416  0.572  0.726  0.857
+IWM         0.143  0.316  0.533  0.708  0.849
+QQQ         0.636  0.392  0.540  0.686  0.810
+SLV        -0.054  0.289  0.551  0.751  0.909
+SPY         0.617  0.385  0.540  0.685  0.806
+
+=== Best per ticker: in-sample Sharpe ===
+  AAPL      : n_mu=  1, x=1.00, sharpe=0.756
+  BTC-USD   : n_mu=  2, x=0.85, sharpe=0.911
+  ETH-USD   : n_mu=  2, x=0.10, sharpe=0.922
+  GLD       : n_mu=  1, x=0.70, sharpe=0.641
+  GOOGL     : n_mu=  2, x=0.85, sharpe=0.657
+  IWM       : n_mu=  1, x=1.00, sharpe=0.595
+  QQQ       : n_mu=  1, x=0.55, sharpe=0.677
+  SLV       : n_mu= 14, x=0.85, sharpe=0.539
+  SPY       : n_mu=  2, x=0.85, sharpe=0.673
+
+=== Best per ticker: MC mean Sharpe ===
+  AAPL      : n_mu=  1, x=1.00, sharpe=0.841
+  BTC-USD   : n_mu=  1, x=1.00, sharpe=0.894
+  ETH-USD   : n_mu=  2, x=0.10, sharpe=0.861
+  GLD       : n_mu=  1, x=1.00, sharpe=0.627
+  GOOGL     : n_mu=  1, x=1.00, sharpe=0.700
+  IWM       : n_mu=  1, x=1.00, sharpe=0.610
+  QQQ       : n_mu=  1, x=1.00, sharpe=0.710
+  SLV       : n_mu=  1, x=1.00, sharpe=0.561
+  SPY       : n_mu=  1, x=1.00, sharpe=0.660
+
+=== Best per ticker: WF mean Sharpe ===
+  AAPL      : n_mu= 19, x=0.85, sharpe=0.893
+  BTC-USD   : n_mu=  3, x=0.85, sharpe=0.738
+  ETH-USD   : n_mu=  3, x=0.55, sharpe=0.864
+  GLD       : n_mu=  5, x=0.10, sharpe=1.036
+  GOOGL     : n_mu= 14, x=0.55, sharpe=0.567
+  IWM       : n_mu= 19, x=0.70, sharpe=1.032
+  QQQ       : n_mu=  5, x=0.55, sharpe=0.800
+  SLV       : n_mu=  7, x=0.55, sharpe=1.047
+  SPY       : n_mu= 14, x=0.85, sharpe=0.852
+
+=== VANILLA (n_mu=1, x=1.0) sweet spot count ===
+  in-sample: 2/9
+  MC mean:   8/9
+  WF mean:   0/9
+
+=== OLD (pre-cluster, pre-accounting-fix?) best ===
+  AAPL      : n_mu=  1, x=1.00, sharpe=0.863
+  BTC-USD   : n_mu=  1, x=1.00, sharpe=0.962
+  ETH-USD   : n_mu=  3, x=0.75, sharpe=0.967
+  GLD       : n_mu=  1, x=0.75, sharpe=0.695
+  GOOGL     : n_mu=  8, x=0.50, sharpe=0.706
+  IWM       : n_mu=  1, x=1.00, sharpe=0.616
+  QQQ       : n_mu=  1, x=1.00, sharpe=0.766
+  SLV       : n_mu=  1, x=1.00, sharpe=0.518
+  SPY       : n_mu=  3, x=0.75, sharpe=0.769
+
+Summary saved: results/cluster_local/cluster_summary.csv

@@ -90,7 +90,9 @@ def run_one_task(
     df = load_one(ticker, timeframe)
     if len(df) < 100:
         raise ValueError(f'{ticker} {timeframe}: only {len(df)} candles')
-    if df.index.tz is not None:
+    # Some loaders return plain Index (dtype=object) without tz attribute;
+    # only attempt tz-strip when it's actually a DatetimeIndex with tz.
+    if hasattr(df.index, 'tz') and df.index.tz is not None:
         df = df.copy()
         df.index = df.index.tz_localize(None)
     prices = np.asarray(df['close'].values, dtype=np.float64)

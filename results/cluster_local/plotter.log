@@ -1,0 +1,16 @@
+Loaded 6400 rows from 4 tickers × 1 timeframes
+  AAPL 1d: 1600 rows
+  BTC-USD 1d: 1600 rows
+  QQQ 1d: 1600 rows
+  SPY 1d: 1600 rows
+
+Cross-ticker medians (1d only)...
+Cross-ticker worst (1d only)...
+
+Sweet spots per metric (1d)...
+  -> results/plots/3d_cluster/sweet_spots_per_metric.csv (28 rows)
+
+VANILLA (n_mu=1, x=1.0) is sweet spot for 0/4 tickers
+Tickers preferring vanilla per metric:
+
+All plots written to results/plots/3d_cluster/
